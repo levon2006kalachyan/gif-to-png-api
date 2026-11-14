@@ -1,0 +1,25 @@
+# Virtual environment
+.venv/
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Test and coverage files
+.pytest_cache/
+.hypothesis/
+.coverage
+htmlcov/
+
+# Generated files
+output/
+
+# Local database
+*.db
+*.sqlite
+*.sqlite3
+
+# IDE and OS
+.vscode/
+.DS_Store
+Thumbs.db   
