@@ -7,6 +7,7 @@ from xml.etree import ElementTree
 
 from src.api.auth import check_basic_auth
 from src.api.storage import MemoryStorage
+from src.api.sqlite_storage import SQLiteStorage
 from src.api.worker import ConversionWorker
 from src.api.xml_utils import create_xml_response
 
@@ -521,7 +522,7 @@ def main():
 
     APIHandler.username = args.username
     APIHandler.password = args.password
-    APIHandler.storage = MemoryStorage()
+    APIHandler.storage = SQLiteStorage("gif_to_png.db")
     APIHandler.worker = ConversionWorker(
         APIHandler.storage,
         test_mode=args.test_mode,
@@ -544,6 +545,7 @@ def main():
         print("\nОстановка сервера...")
     finally:
         server.server_close()
+        APIHandler.storage.close()
 
 
 if __name__ == "__main__":
