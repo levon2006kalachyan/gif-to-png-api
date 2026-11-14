@@ -9,7 +9,10 @@ __pycache__/
 .pytest_cache/
 .hypothesis/
 .coverage
+.coverage.*
 htmlcov/
+coverage.json
+coverage.xml
 
 # Generated files
 output/
@@ -22,4 +25,4 @@ output/
 # IDE and OS
 .vscode/
 .DS_Store
-Thumbs.db   
+Thumbs.db
