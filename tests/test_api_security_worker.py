@@ -1,4 +1,3 @@
-
 import base64
 import subprocess
 import time
@@ -6,16 +5,13 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
-from hypothesis import given, settings, strategies as st
+from hypothesis import given, settings
+from hypothesis import strategies as st
 
 from src.api.auth import check_basic_auth
 from src.api.storage import MemoryStorage
 from src.api.worker import ConversionWorker
 
-
-# ==========================================================
-# BASIC AUTHENTICATION
-# ==========================================================
 
 @given(
     username=st.text(
@@ -33,9 +29,7 @@ from src.api.worker import ConversionWorker
 def test_valid_basic_auth(username, password):
     credentials = f"{username}:{password}"
 
-    encoded = base64.b64encode(
-        credentials.encode("utf-8")
-    ).decode("ascii")
+    encoded = base64.b64encode(credentials.encode("utf-8")).decode("ascii")
 
     header = f"Basic {encoded}"
 
@@ -55,9 +49,7 @@ def test_valid_basic_auth(username, password):
         "Basic invalid!!!",
         "Basic",
         "Basic !!!",
-        "Basic " + base64.b64encode(
-            b"invalidcredentials"
-        ).decode("ascii"),
+        "Basic " + base64.b64encode(b"invalidcredentials").decode("ascii"),
     ],
 )
 def test_invalid_basic_auth(header):
@@ -69,9 +61,7 @@ def test_invalid_basic_auth(header):
 
 
 def test_wrong_basic_auth_password():
-    encoded = base64.b64encode(
-        b"admin:wrongpassword"
-    ).decode("ascii")
+    encoded = base64.b64encode(b"admin:wrongpassword").decode("ascii")
 
     assert not check_basic_auth(
         f"Basic {encoded}",
@@ -79,10 +69,6 @@ def test_wrong_basic_auth_password():
         "admin123",
     )
 
-
-# ==========================================================
-# WORKER
-# ==========================================================
 
 @pytest.fixture
 def storage_with_instruction():
@@ -106,9 +92,7 @@ def wait_for_completion(storage, completion_id):
     deadline = time.monotonic() + 10
 
     while time.monotonic() < deadline:
-        completion = storage.get_completion(
-            completion_id
-        )
+        completion = storage.get_completion(completion_id)
 
         if completion["stage"] in (
             "completed",
@@ -118,9 +102,7 @@ def wait_for_completion(storage, completion_id):
 
         time.sleep(0.01)
 
-    pytest.fail(
-        "Worker did not finish within 10 seconds"
-    )
+    pytest.fail("Worker did not finish within 10 seconds")
 
 
 def test_worker_test_mode(storage_with_instruction):
@@ -154,7 +136,6 @@ def test_worker_real_conversion(
         test_mode=False,
     )
 
-    # Изолируем результаты от основной папки output.
     with patch(
         "src.api.worker.OUTPUT_DIR",
         tmp_path,
@@ -171,9 +152,7 @@ def test_worker_real_conversion(
     output_path = Path(result["result"])
 
     assert output_path.is_file()
-    assert output_path.read_bytes().startswith(
-        b"\x89PNG\r\n\x1a\n"
-    )
+    assert output_path.read_bytes().startswith(b"\x89PNG\r\n\x1a\n")
 
 
 def test_worker_subprocess_error(
@@ -268,8 +247,6 @@ def test_worker_missing_output(
         stderr="",
     )
 
-    # Временная папка не содержит готового PNG.
-    # Подменённый subprocess тоже ничего не создаёт.
     with (
         patch(
             "src.api.worker.OUTPUT_DIR",
@@ -288,7 +265,4 @@ def test_worker_missing_output(
         )
 
     assert result["stage"] == "failed"
-    assert (
-        "PNG output file was not created"
-        in result["failure"]
-    )
+    assert "PNG output file was not created" in result["failure"]

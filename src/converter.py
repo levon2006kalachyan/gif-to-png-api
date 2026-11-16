@@ -1,4 +1,3 @@
-
 import sys
 from pathlib import Path
 
@@ -12,9 +11,7 @@ def convert_gif_to_png(input_path: str, output_path: str) -> str:
     destination = Path(output_path)
 
     if not source.is_file():
-        raise FileNotFoundError(
-            f"Входной файл не найден: {source}"
-        )
+        raise FileNotFoundError(f"Входной файл не найден: {source}")
 
     if source.suffix.lower() != ".gif":
         raise ValueError("Входной файл должен иметь расширение .gif")
@@ -34,9 +31,7 @@ def convert_gif_to_png(input_path: str, output_path: str) -> str:
             frame.save(destination, format="PNG")
 
     except (UnidentifiedImageError, OSError) as error:
-        raise ValueError(
-            f"Не удалось обработать GIF-файл: {source}"
-        ) from error
+        raise ValueError(f"Не удалось обработать GIF-файл: {source}") from error
 
     return str(destination)
 
@@ -45,19 +40,13 @@ def main() -> int:
     """Читает пути из stdin и запускает преобразование."""
 
     try:
-        print(
-            "Введите путь к GIF-файлу:",
-            file=sys.stderr
-        )
+        print("Введите путь к GIF-файлу:", file=sys.stderr)
         input_path = sys.stdin.readline().strip().strip('"')
 
         if not input_path:
             raise ValueError("Не указан путь к GIF-файлу")
 
-        print(
-            "Введите путь для сохранения PNG:",
-            file=sys.stderr
-        )
+        print("Введите путь для сохранения PNG:", file=sys.stderr)
         output_path = sys.stdin.readline().strip().strip('"')
 
         if not output_path:
@@ -72,7 +61,7 @@ def main() -> int:
         FileNotFoundError,
         ValueError,
         UnidentifiedImageError,
-        OSError
+        OSError,
     ) as error:
         print(f"ERROR: {error}", file=sys.stderr)
         return 1

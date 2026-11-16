@@ -1,7 +1,8 @@
-
 import pytest
 
 from src.api.sqlite_storage import SQLiteStorage
+
+EXPECTED_DURATION_MS = 250
 
 
 @pytest.fixture
@@ -95,7 +96,7 @@ def test_completion_crud(storage):
     assert updated["stage"] == "completed"
     assert updated["result"] == "output/test.png"
     assert updated["cache_hit"] == 1
-    assert updated["duration"] == 250
+    assert updated["duration"] == EXPECTED_DURATION_MS
     assert storage.get_completion(completion["id"]) == updated
     assert len(storage.scan_completions(instruction["id"])) == 1
 

@@ -26,3 +26,8 @@ output/
 .vscode/
 .DS_Store
 Thumbs.db
+# Ruff cache
+.ruff_cache/
+
+# Additional coverage reports
+htmlcov_sqlite/

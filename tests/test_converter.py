@@ -1,4 +1,3 @@
-
 from pathlib import Path
 
 import pytest
@@ -30,10 +29,9 @@ def test_convert_four_examples(filename, tmp_path):
     assert output_path.exists()
     assert Path(result) == output_path
 
-    with Image.open(input_path) as source:
-        with Image.open(output_path) as output:
-            assert output.format == "PNG"
-            assert output.size == source.size
+    with Image.open(input_path) as source, Image.open(output_path) as output:
+        assert output.format == "PNG"
+        assert output.size == source.size
 
 
 def test_missing_file(tmp_path):

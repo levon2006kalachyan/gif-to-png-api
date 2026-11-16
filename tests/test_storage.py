@@ -1,7 +1,10 @@
-
 import pytest
 
 from src.api.storage import MemoryStorage
+
+EXPECTED_COUNT = 2
+EXPECTED_DURATION_MS = 25
+EXPECTED_REPORT_DURATION_MS = 15
 
 
 @pytest.fixture
@@ -26,7 +29,7 @@ def test_scan_sessions(storage):
 
     sessions = storage.scan_sessions()
 
-    assert len(sessions) == 2
+    assert len(sessions) == EXPECTED_COUNT
 
 
 def test_get_session(storage):
@@ -84,7 +87,7 @@ def test_scan_instructions(storage):
 
     result = storage.scan_instructions(session["id"])
 
-    assert len(result) == 2
+    assert len(result) == EXPECTED_COUNT
 
 
 def test_edit_instruction(storage):
@@ -119,7 +122,7 @@ def test_add_completion(storage):
     )
 
     assert completion["stage"] == "completed"
-    assert completion["duration"] == 25
+    assert completion["duration"] == EXPECTED_DURATION_MS
 
 
 def test_completion_requires_instruction(storage):
@@ -142,7 +145,7 @@ def test_scan_completions(storage):
 
     result = storage.scan_completions(instruction["id"])
 
-    assert len(result) == 2
+    assert len(result) == EXPECTED_COUNT
 
 
 def test_report_scan(storage):
@@ -164,6 +167,6 @@ def test_report_scan(storage):
     report = storage.report_scan()
 
     assert len(report) == 1
-    assert report[0]["duration"] == 15
+    assert report[0]["duration"] == EXPECTED_REPORT_DURATION_MS
     assert report[0]["result"] == "result.png"
     assert report[0]["tags"] == "conversion"

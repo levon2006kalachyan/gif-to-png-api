@@ -1,11 +1,9 @@
-
 from sqlalchemy import ForeignKey, Integer, String
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
 class Base(DeclarativeBase):
     """Базовый класс моделей SQLAlchemy."""
-    pass
 
 
 class SessionModel(Base):
@@ -46,7 +44,9 @@ class CompletionModel(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     timestamp: Mapped[int] = mapped_column(Integer, nullable=False)
     result: Mapped[str] = mapped_column(String, default="", nullable=False)
-    stage: Mapped[str] = mapped_column(String, default="pending", nullable=False)
+    stage: Mapped[str] = mapped_column(
+        String, default="pending", nullable=False
+    )
     failure: Mapped[str] = mapped_column(String, default="", nullable=False)
     instruction: Mapped[int] = mapped_column(
         ForeignKey("instructions.id"), nullable=False

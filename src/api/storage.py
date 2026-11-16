@@ -1,4 +1,3 @@
-
 from dataclasses import asdict, dataclass
 from threading import RLock
 from time import time
@@ -63,10 +62,7 @@ class MemoryStorage:
 
     def scan_sessions(self):
         with self._lock:
-            return [
-                asdict(session)
-                for session in self.sessions.values()
-            ]
+            return [asdict(session) for session in self.sessions.values()]
 
     def get_session(self, session_id):
         with self._lock:
@@ -212,9 +208,7 @@ class MemoryStorage:
             report = []
 
             for completion in self.completions.values():
-                instruction = self.instructions.get(
-                    completion.instruction
-                )
+                instruction = self.instructions.get(completion.instruction)
 
                 if instruction is None:
                     continue
@@ -222,10 +216,12 @@ class MemoryStorage:
                 if instruction.timestamp < cutoff:
                     continue
 
-                report.append({
-                    "duration": completion.duration,
-                    "result": completion.result,
-                    "tags": instruction.tags,
-                })
+                report.append(
+                    {
+                        "duration": completion.duration,
+                        "result": completion.result,
+                        "tags": instruction.tags,
+                    }
+                )
 
             return report

@@ -1,4 +1,3 @@
-
 from pathlib import Path
 from time import time
 
@@ -7,11 +6,10 @@ from sqlalchemy.orm import sessionmaker
 
 from src.api.models import (
     Base,
-    SessionModel,
-    InstructionModel,
     CompletionModel,
+    InstructionModel,
+    SessionModel,
 )
-
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_DB_PATH = PROJECT_ROOT / "gif_to_png.db"
@@ -77,8 +75,6 @@ class SQLiteStorage:
             "duration": obj.duration,
         }
 
-    # SESSION
-
     def add_session(self, locale="", user_agent=""):
         with self.SessionFactory.begin() as db:
             obj = SessionModel(
@@ -115,8 +111,6 @@ class SQLiteStorage:
 
             db.flush()
             return self._session_dict(obj)
-
-    # INSTRUCTION
 
     def add_instruction(self, session_id, argument, tags=""):
         with self.SessionFactory.begin() as db:
@@ -160,8 +154,6 @@ class SQLiteStorage:
 
             db.flush()
             return self._instruction_dict(obj)
-
-    # COMPLETION
 
     def add_completion(
         self,
@@ -223,8 +215,6 @@ class SQLiteStorage:
             db.flush()
             return self._completion_dict(obj)
 
-    # REPORT
-
     def report_scan(self):
         """Отчёт по инструкциям за последние 6 минут."""
 
@@ -239,8 +229,7 @@ class SQLiteStorage:
                 )
                 .join(
                     InstructionModel,
-                    CompletionModel.instruction
-                    == InstructionModel.id,
+                    CompletionModel.instruction == InstructionModel.id,
                 )
                 .where(InstructionModel.timestamp >= cutoff)
                 .order_by(CompletionModel.id)

@@ -1,4 +1,3 @@
-
 import tempfile
 import threading
 from http.server import ThreadingHTTPServer
@@ -19,17 +18,17 @@ class SQLiteAPIStateMachine(APIStateMachine):
     def __init__(self):
         super().__init__()
 
-        # Останавливаем сервер, созданный базовым классом.
         self.server.shutdown()
         self.server.server_close()
         self.thread.join(timeout=5)
 
-        # Отдельная временная SQLite-база для каждого сценария.
         self.temp_dir = tempfile.TemporaryDirectory()
         db_path = Path(self.temp_dir.name) / "test.db"
-
         self.storage = SQLiteStorage(db_path)
 
+        self._start_sqlite_server()
+
+    def _start_sqlite_server(self):
         class SQLiteTestHandler(APIHandler):
             pass
 
@@ -45,7 +44,6 @@ class SQLiteAPIStateMachine(APIStateMachine):
             ("127.0.0.1", 0),
             SQLiteTestHandler,
         )
-
         self.thread = threading.Thread(
             target=self.server.serve_forever,
             daemon=True,
@@ -53,7 +51,6 @@ class SQLiteAPIStateMachine(APIStateMachine):
         self.thread.start()
 
         host, port = self.server.server_address
-
         self.client = APIClient(
             base_url=f"http://{host}:{port}",
             username="test",

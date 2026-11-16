@@ -1,15 +1,15 @@
-
 import argparse
-
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 from xml.etree import ElementTree
 
 from src.api.auth import check_basic_auth
-from src.api.storage import MemoryStorage
 from src.api.sqlite_storage import SQLiteStorage
+from src.api.storage import MemoryStorage
 from src.api.worker import ConversionWorker
 from src.api.xml_utils import create_xml_response
+
+MAX_XML_BODY_SIZE = 1024 * 1024
 
 
 class APIHandler(BaseHTTPRequestHandler):
@@ -72,15 +72,11 @@ class APIHandler(BaseHTTPRequestHandler):
 
     def get_xml_body(self):
         try:
-            length = int(
-                self.headers.get("Content-Length", "0")
-            )
+            length = int(self.headers.get("Content-Length", "0"))
         except ValueError as error:
-            raise ValueError(
-                "Invalid Content-Length"
-            ) from error
+            raise ValueError("Invalid Content-Length") from error
 
-        if length <= 0 or length > 1024 * 1024:
+        if length <= 0 or length > MAX_XML_BODY_SIZE:
             raise ValueError("Invalid XML body length")
 
         body = self.rfile.read(length)
@@ -90,10 +86,7 @@ class APIHandler(BaseHTTPRequestHandler):
         except ElementTree.ParseError as error:
             raise ValueError("Invalid XML body") from error
 
-        return {
-            child.tag: child.text or ""
-            for child in root
-        }
+        return {child.tag: child.text or "" for child in root}
 
     @staticmethod
     def parse_id(value):
@@ -112,200 +105,138 @@ class APIHandler(BaseHTTPRequestHandler):
             return
 
         path = urlparse(self.path).path
-        query = self.get_query()
+        routes = {
+            "/api/health": self.get_health,
+            "/api/session-scan": self.get_session_scan,
+            "/api/session-single": self.get_session_single,
+            "/api/instruction-single": self.get_instruction_single,
+            "/api/completion-single": self.get_completion_single,
+            "/api/report-scan": self.get_report_scan,
+        }
 
-        # HEALTH
+        handler = routes.get(path)
+        if handler is not None:
+            handler()
+        elif path.startswith("/api/instruction-scan/"):
+            self.get_instruction_scan(path)
+        elif path.startswith("/api/completion-scan/"):
+            self.get_completion_scan(path)
+        else:
+            self.send_xml(404, "error", "Endpoint not found")
 
-        if path == "/api/health":
-            self.send_xml(
-                200,
-                "success",
-                "Server is running",
-                {"service": "gif-to-png-api"},
-            )
-            return
-
-        # SESSION
-
-        if path == "/api/session-scan":
-            sessions = self.storage.scan_sessions()
-            data = {"count": len(sessions)}
-
-            for index, session in enumerate(sessions):
-                data[f"session_{index}_id"] = session["id"]
-                data[f"session_{index}_locale"] = session["locale"]
-
-            self.send_xml(
-                200, "success", "Sessions found", data
-            )
-            return
-
-        if path == "/api/session-single":
-            session_id = self.parse_id(query.get("id"))
-
-            if session_id is None:
-                self.send_xml(
-                    400, "error", "Invalid session id"
-                )
-                return
-
-            session = self.storage.get_session(session_id)
-
-            if session is None:
-                self.send_xml(
-                    404, "error", "Session not found"
-                )
-                return
-
-            self.send_xml(
-                200, "success", "Session found", session
-            )
-            return
-
-        # INSTRUCTION
-
-        if path.startswith("/api/instruction-scan/"):
-            session_id = self.parse_id(
-                path.rsplit("/", 1)[-1]
-            )
-
-            if session_id is None:
-                self.send_xml(
-                    400, "error", "Invalid session id"
-                )
-                return
-
-            if self.storage.get_session(session_id) is None:
-                self.send_xml(
-                    404, "error", "Session not found"
-                )
-                return
-
-            instructions = self.storage.scan_instructions(
-                session_id
-            )
-            data = {"count": len(instructions)}
-
-            for index, instruction in enumerate(instructions):
-                prefix = f"instruction_{index}"
-                data[f"{prefix}_id"] = instruction["id"]
-                data[f"{prefix}_argument"] = instruction["argument"]
-                data[f"{prefix}_tags"] = instruction["tags"]
-
-            self.send_xml(
-                200, "success", "Instructions found", data
-            )
-            return
-
-        if path == "/api/instruction-single":
-            instruction_id = self.parse_id(
-                query.get("id")
-            )
-
-            if instruction_id is None:
-                self.send_xml(
-                    400, "error", "Invalid instruction id"
-                )
-                return
-
-            instruction = self.storage.get_instruction(
-                instruction_id
-            )
-
-            if instruction is None:
-                self.send_xml(
-                    404, "error", "Instruction not found"
-                )
-                return
-
-            self.send_xml(
-                200, "success", "Instruction found", instruction
-            )
-            return
-
-        # COMPLETION
-
-        if path.startswith("/api/completion-scan/"):
-            instruction_id = self.parse_id(
-                path.rsplit("/", 1)[-1]
-            )
-
-            if instruction_id is None:
-                self.send_xml(
-                    400, "error", "Invalid instruction id"
-                )
-                return
-
-            if self.storage.get_instruction(instruction_id) is None:
-                self.send_xml(
-                    404, "error", "Instruction not found"
-                )
-                return
-
-            completions = self.storage.scan_completions(
-                instruction_id
-            )
-
-            data = {"count": len(completions)}
-
-            for index, completion in enumerate(completions):
-                prefix = f"completion_{index}"
-
-                for key, value in completion.items():
-                    data[f"{prefix}_{key}"] = value
-
-            self.send_xml(
-                200, "success", "Completions found", data
-            )
-            return
-
-        if path == "/api/completion-single":
-            completion_id = self.parse_id(
-                query.get("id")
-            )
-
-            if completion_id is None:
-                self.send_xml(
-                    400, "error", "Invalid completion id"
-                )
-                return
-
-            completion = self.storage.get_completion(
-                completion_id
-            )
-
-            if completion is None:
-                self.send_xml(
-                    404, "error", "Completion not found"
-                )
-                return
-
-            self.send_xml(
-                200, "success", "Completion found", completion
-            )
-            return
-
-        # REPORT
-
-        if path == "/api/report-scan":
-            report = self.storage.report_scan()
-
-            data = {"count": len(report)}
-
-            for index, row in enumerate(report):
-                prefix = f"report_{index}"
-
-                for key, value in row.items():
-                    data[f"{prefix}_{key}"] = value
-
-            self.send_xml(
-                200, "success", "Report generated", data
-            )
-            return
-
+    def get_health(self):
         self.send_xml(
-            404, "error", "Endpoint not found"
+            200,
+            "success",
+            "Server is running",
+            {"service": "gif-to-png-api"},
         )
+
+    def get_session_scan(self):
+        sessions = self.storage.scan_sessions()
+        data = {"count": len(sessions)}
+
+        for index, session in enumerate(sessions):
+            data[f"session_{index}_id"] = session["id"]
+            data[f"session_{index}_locale"] = session["locale"]
+
+        self.send_xml(200, "success", "Sessions found", data)
+
+    def get_session_single(self):
+        session_id = self.parse_id(self.get_query().get("id"))
+
+        if session_id is None:
+            self.send_xml(400, "error", "Invalid session id")
+            return
+
+        session = self.storage.get_session(session_id)
+        if session is None:
+            self.send_xml(404, "error", "Session not found")
+            return
+
+        self.send_xml(200, "success", "Session found", session)
+
+    def get_instruction_scan(self, path):
+        session_id = self.parse_id(path.rsplit("/", 1)[-1])
+
+        if session_id is None:
+            self.send_xml(400, "error", "Invalid session id")
+            return
+
+        if self.storage.get_session(session_id) is None:
+            self.send_xml(404, "error", "Session not found")
+            return
+
+        instructions = self.storage.scan_instructions(session_id)
+        data = {"count": len(instructions)}
+
+        for index, instruction in enumerate(instructions):
+            prefix = f"instruction_{index}"
+            data[f"{prefix}_id"] = instruction["id"]
+            data[f"{prefix}_argument"] = instruction["argument"]
+            data[f"{prefix}_tags"] = instruction["tags"]
+
+        self.send_xml(200, "success", "Instructions found", data)
+
+    def get_instruction_single(self):
+        instruction_id = self.parse_id(self.get_query().get("id"))
+
+        if instruction_id is None:
+            self.send_xml(400, "error", "Invalid instruction id")
+            return
+
+        instruction = self.storage.get_instruction(instruction_id)
+        if instruction is None:
+            self.send_xml(404, "error", "Instruction not found")
+            return
+
+        self.send_xml(200, "success", "Instruction found", instruction)
+
+    def get_completion_scan(self, path):
+        instruction_id = self.parse_id(path.rsplit("/", 1)[-1])
+
+        if instruction_id is None:
+            self.send_xml(400, "error", "Invalid instruction id")
+            return
+
+        if self.storage.get_instruction(instruction_id) is None:
+            self.send_xml(404, "error", "Instruction not found")
+            return
+
+        completions = self.storage.scan_completions(instruction_id)
+        data = {"count": len(completions)}
+
+        for index, completion in enumerate(completions):
+            prefix = f"completion_{index}"
+            for key, value in completion.items():
+                data[f"{prefix}_{key}"] = value
+
+        self.send_xml(200, "success", "Completions found", data)
+
+    def get_completion_single(self):
+        completion_id = self.parse_id(self.get_query().get("id"))
+
+        if completion_id is None:
+            self.send_xml(400, "error", "Invalid completion id")
+            return
+
+        completion = self.storage.get_completion(completion_id)
+        if completion is None:
+            self.send_xml(404, "error", "Completion not found")
+            return
+
+        self.send_xml(200, "success", "Completion found", completion)
+
+    def get_report_scan(self):
+        report = self.storage.report_scan()
+        data = {"count": len(report)}
+
+        for index, row in enumerate(report):
+            prefix = f"report_{index}"
+            for key, value in row.items():
+                data[f"{prefix}_{key}"] = value
+
+        self.send_xml(200, "success", "Report generated", data)
 
     def do_POST(self):
         if not self.authenticate():
@@ -314,76 +245,53 @@ class APIHandler(BaseHTTPRequestHandler):
         path = urlparse(self.path).path
         query = self.get_query()
 
-        # SESSION
-
         if path == "/api/session-add":
-            session = self.storage.add_session(
-                locale=query.get("locale", ""),
-                user_agent=query.get("user_agent", ""),
-            )
+            self.post_session_add(query)
+        elif path == "/api/instruction-add":
+            self.post_instruction_add(query)
+        else:
+            self.send_xml(404, "error", "Endpoint not found")
 
-            self.send_xml(
-                200, "success", "Session created", session
-            )
-            return
-
-        # INSTRUCTION
-
-        if path == "/api/instruction-add":
-            session_id = self.parse_id(
-                query.get("session")
-            )
-
-            argument = query.get("argument", "")
-            tags = query.get("tags", "")
-
-            if session_id is None:
-                self.send_xml(
-                    400, "error", "Invalid session id"
-                )
-                return
-
-            if not argument:
-                self.send_xml(
-                    400, "error", "Argument is required"
-                )
-                return
-
-            try:
-                instruction = self.storage.add_instruction(
-                    session_id=session_id,
-                    argument=argument,
-                    tags=tags,
-                )
-            except ValueError as error:
-                self.send_xml(
-                    404, "error", str(error)
-                )
-                return
-
-            if self.worker is None:
-                self.send_xml(
-                    503, "error", "Worker unavailable"
-                )
-                return
-
-            completion = self.worker.start(instruction)
-
-            response_data = dict(instruction)
-            response_data["completion_id"] = completion["id"]
-            response_data["stage"] = completion["stage"]
-
-            self.send_xml(
-                200,
-                "success",
-                "Instruction created",
-                response_data,
-            )
-            return
-
-        self.send_xml(
-            404, "error", "Endpoint not found"
+    def post_session_add(self, query):
+        session = self.storage.add_session(
+            locale=query.get("locale", ""),
+            user_agent=query.get("user_agent", ""),
         )
+        self.send_xml(200, "success", "Session created", session)
+
+    def post_instruction_add(self, query):
+        session_id = self.parse_id(query.get("session"))
+        argument = query.get("argument", "")
+        tags = query.get("tags", "")
+
+        if session_id is None:
+            self.send_xml(400, "error", "Invalid session id")
+            return
+
+        if not argument:
+            self.send_xml(400, "error", "Argument is required")
+            return
+
+        try:
+            instruction = self.storage.add_instruction(
+                session_id=session_id,
+                argument=argument,
+                tags=tags,
+            )
+        except ValueError as error:
+            self.send_xml(404, "error", str(error))
+            return
+
+        if self.worker is None:
+            self.send_xml(503, "error", "Worker unavailable")
+            return
+
+        completion = self.worker.start(instruction)
+        response_data = dict(instruction)
+        response_data["completion_id"] = completion["id"]
+        response_data["stage"] = completion["stage"]
+
+        self.send_xml(200, "success", "Instruction created", response_data)
 
     def do_PATCH(self):
         if not self.authenticate():
@@ -391,134 +299,82 @@ class APIHandler(BaseHTTPRequestHandler):
 
         path = urlparse(self.path).path
 
-        # SESSION
-
         if path.startswith("/api/session-edit/"):
-            session_id = self.parse_id(
-                path.rsplit("/", 1)[-1]
-            )
+            self.patch_session(path)
+        elif path.startswith("/api/instruction-edit/"):
+            self.patch_instruction(path)
+        else:
+            self.send_xml(404, "error", "Endpoint not found")
 
-            if session_id is None:
-                self.send_xml(
-                    400, "error", "Invalid session id"
-                )
-                return
+    def patch_session(self, path):
+        session_id = self.parse_id(path.rsplit("/", 1)[-1])
 
-            try:
-                changes = self.get_xml_body()
-            except ValueError as error:
-                self.send_xml(
-                    400, "error", str(error)
-                )
-                return
-
-            allowed = {"locale", "user_agent"}
-
-            if not changes or not set(changes).issubset(allowed):
-                self.send_xml(
-                    400, "error", "Invalid session fields"
-                )
-                return
-
-            session = self.storage.edit_session(
-                session_id,
-                **changes,
-            )
-
-            if session is None:
-                self.send_xml(
-                    404, "error", "Session not found"
-                )
-                return
-
-            self.send_xml(
-                200, "success", "Session updated", session
-            )
+        if session_id is None:
+            self.send_xml(400, "error", "Invalid session id")
             return
 
-        # INSTRUCTION
-
-        if path.startswith("/api/instruction-edit/"):
-            instruction_id = self.parse_id(
-                path.rsplit("/", 1)[-1]
-            )
-
-            if instruction_id is None:
-                self.send_xml(
-                    400, "error", "Invalid instruction id"
-                )
-                return
-
-            try:
-                changes = self.get_xml_body()
-            except ValueError as error:
-                self.send_xml(
-                    400, "error", str(error)
-                )
-                return
-
-            allowed = {"argument", "tags"}
-
-            if not changes or not set(changes).issubset(allowed):
-                self.send_xml(
-                    400, "error", "Invalid instruction fields"
-                )
-                return
-
-            instruction = self.storage.edit_instruction(
-                instruction_id,
-                **changes,
-            )
-
-            if instruction is None:
-                self.send_xml(
-                    404, "error", "Instruction not found"
-                )
-                return
-
-            self.send_xml(
-                200, "success", "Instruction updated", instruction
-            )
+        try:
+            changes = self.get_xml_body()
+        except ValueError as error:
+            self.send_xml(400, "error", str(error))
             return
 
-        self.send_xml(
-            404, "error", "Endpoint not found"
-        )
+        allowed = {"locale", "user_agent"}
+        if not changes or not set(changes).issubset(allowed):
+            self.send_xml(400, "error", "Invalid session fields")
+            return
+
+        session = self.storage.edit_session(session_id, **changes)
+
+        if session is None:
+            self.send_xml(404, "error", "Session not found")
+            return
+
+        self.send_xml(200, "success", "Session updated", session)
+
+    def patch_instruction(self, path):
+        instruction_id = self.parse_id(path.rsplit("/", 1)[-1])
+
+        if instruction_id is None:
+            self.send_xml(400, "error", "Invalid instruction id")
+            return
+
+        try:
+            changes = self.get_xml_body()
+        except ValueError as error:
+            self.send_xml(400, "error", str(error))
+            return
+
+        allowed = {"argument", "tags"}
+        if not changes or not set(changes).issubset(allowed):
+            self.send_xml(400, "error", "Invalid instruction fields")
+            return
+
+        instruction = self.storage.edit_instruction(instruction_id, **changes)
+
+        if instruction is None:
+            self.send_xml(404, "error", "Instruction not found")
+            return
+
+        self.send_xml(200, "success", "Instruction updated", instruction)
 
 
-def main():
-    parser = argparse.ArgumentParser(
-        description="GIF to PNG HTTP API"
-    )
-
-    parser.add_argument(
-        "--host",
-        default="127.0.0.1",
-    )
-
-    parser.add_argument(
-        "--port",
-        type=int,
-        default=8765,
-    )
-
-    parser.add_argument(
-        "--username",
-        required=True,
-    )
-
-    parser.add_argument(
-        "--password",
-        required=True,
-    )
-
+def parse_arguments():
+    parser = argparse.ArgumentParser(description="GIF to PNG HTTP API")
+    parser.add_argument("--host", default="127.0.0.1")
+    parser.add_argument("--port", type=int, default=8765)
+    parser.add_argument("--username", required=True)
+    parser.add_argument("--password", required=True)
     parser.add_argument(
         "--test-mode",
         action="store_true",
         help="Do not execute real GIF conversions",
     )
+    return parser.parse_args()
 
-    args = parser.parse_args()
+
+def main():
+    args = parse_arguments()
 
     APIHandler.username = args.username
     APIHandler.password = args.password
@@ -534,15 +390,14 @@ def main():
     )
 
     print(
-        f"GIF to PNG API запущен: "
-        f"http://{args.host}:{args.port}",
+        f"GIF to PNG API ???????: http://{args.host}:{args.port}",
         flush=True,
     )
 
     try:
         server.serve_forever()
     except KeyboardInterrupt:
-        print("\nОстановка сервера...")
+        print("\n????????? ???????...")
     finally:
         server.server_close()
         APIHandler.storage.close()
