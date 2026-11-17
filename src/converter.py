@@ -31,7 +31,9 @@ def convert_gif_to_png(input_path: str, output_path: str) -> str:
             frame.save(destination, format="PNG")
 
     except (UnidentifiedImageError, OSError) as error:
-        raise ValueError(f"Не удалось обработать GIF-файл: {source}") from error
+        raise ValueError(
+            f"Не удалось обработать GIF-файл: {source}"
+        ) from error
 
     return str(destination)
 

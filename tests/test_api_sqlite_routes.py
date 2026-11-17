@@ -73,7 +73,9 @@ def build_route_operations(client, session_id, instruction_id, completion_id):
             session_id, "examples/blue_circle.gif", "blue"
         ),
         "instruction-scan": lambda: client.instruction_scan(session_id),
-        "instruction-single": lambda: client.instruction_single(instruction_id),
+        "instruction-single": lambda: client.instruction_single(
+            instruction_id
+        ),
         "instruction-edit": lambda: client.instruction_edit(
             instruction_id, tags="updated"
         ),
