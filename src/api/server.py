@@ -390,7 +390,7 @@ def main():
     )
 
     print(
-        f"GIF to PNG API ???????: http://{args.host}:{args.port}",
+        "GIF to PNG API started: http://{}:{}".format(args.host, args.port),
         flush=True,
     )
 

@@ -26,7 +26,7 @@ class SQLiteStorage:
         db_path.parent.mkdir(parents=True, exist_ok=True)
 
         self.engine = create_engine(
-            f"sqlite:///{db_path.as_posix()}",
+            "sqlite:///" + db_path.as_posix(),
             connect_args={"timeout": 30},
         )
 

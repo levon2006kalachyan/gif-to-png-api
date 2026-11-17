@@ -52,7 +52,7 @@ class SQLiteAPIStateMachine(APIStateMachine):
 
         host, port = self.server.server_address
         self.client = APIClient(
-            base_url=f"http://{host}:{port}",
+            base_url="http://{}:{}".format(host, port),
             username="test",
             password="test123",
         )

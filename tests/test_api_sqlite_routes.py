@@ -13,7 +13,7 @@ from src.api.worker import ConversionWorker
 def create_client(server):
     host, port = server.server_address
     return APIClient(
-        base_url=f"http://{host}:{port}",
+        base_url="http://{}:{}".format(host, port),
         username="test",
         password="test123",
     )

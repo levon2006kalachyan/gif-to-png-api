@@ -18,7 +18,7 @@ class APIClient:
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
 
-        credentials = f"{username}:{password}".encode()
+        credentials = (username + ":" + password).encode()
         encoded = base64.b64encode(credentials).decode("ascii")
 
         self.authorization = f"Basic {encoded}"

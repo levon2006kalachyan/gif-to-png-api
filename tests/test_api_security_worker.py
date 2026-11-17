@@ -27,7 +27,7 @@ from src.api.worker import ConversionWorker
 )
 @settings(max_examples=30)
 def test_valid_basic_auth(username, password):
-    credentials = f"{username}:{password}"
+    credentials = username + ":" + password
 
     encoded = base64.b64encode(credentials.encode("utf-8")).decode("ascii")
 
